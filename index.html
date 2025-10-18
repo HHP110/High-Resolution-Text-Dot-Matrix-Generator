@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>高分辨率文字点阵制作工具</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .control-panel {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #222;
+      border-radius: 5px;
+    }
+    .control-group {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .control-group label {
+      width: 150px;
+      display: inline-block;
+    }
+    .control-group input[type="range"],
+    .control-group select {
+      flex-grow: 1;
+      margin: 0 10px;
+    }
+    .control-group input[type="color"] {
+      width: 50px;
+      height: 30px;
+      margin: 0 10px;
+    }
+    .control-group .value-display {
+      width: 40px;
+      text-align: right;
+    }
+    #text-input {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    #display-container {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      gap: 0;
+      overflow-x: auto;
+      background-color: #111;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #save-btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #save-btn:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="control-panel">
+    <div class="control-group">
+      <label for="text-input">输入文字：</label>
+      <input type="text" id="text-input" placeholder="输入要显示的文字">
+    </div>
+    
+    <div class="control-group">
+      <label for="font-family">字体选择：</label>
+      <select id="font-family">
+        <option value="SimSun">宋体</option>
+        <option value="Microsoft YaHei">微软雅黑</option>
+        <option value="Arial">Arial</option>
+        <option value="Times New Roman">Times New Roman</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label for="bold-text">加粗：</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="bold-text">
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <label for="resolution">点阵分辨率：</label>
+      <select id="resolution">
+        <option value="32">32×32</option>
+        <option value="64" selected>64×64</option>
+        <option value="128">128×128</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label for="led-color">LED颜色：</label>
+      <input type="color" id="led-color" value="#ffff00">
+      <span class="value-display" id="led-color-value">#ffff00</span>
+    </div>
+    
+    <div class="control-group">
+      <label for="canvas-size">显示大小：</label>
+      <input type="range" id="canvas-size" min="50" max="500" value="200">
+      <span class="value-display" id="canvas-size-value">200</span>
+    </div>
+    
+    <div class="control-group">
+      <label for="point-scale">点大小比例：</label>
+      <input type="range" id="point-scale" min="0.1" max="0.8" step="0.01" value="0.5">
+      <span class="value-display" id="point-scale-value">0.5</span>
+    </div>
+    
+    <div class="control-group">
+      <label for="char-spacing">字符间距：</label>
+      <input type="range" id="char-spacing" min="0" max="100" value="20">
+      <span class="value-display" id="char-spacing-value">20</span>
+    </div>
+
+    <div class="control-group">
+      <button id="save-btn">保存图片</button>
+    </div>
+  </div>
+  
+  <div id="display-container"></div>
+
+<script>
+  function TextPointSet() {}
+  TextPointSet.prototype.points = {}
+  TextPointSet.prototype.canvas = document.createElement('canvas');
+  TextPointSet.prototype.ctx = TextPointSet.prototype.canvas.getContext('2d');
+  
+  TextPointSet.prototype.get = function (text, fontFamily, isBold, resolution) {
+    var key = text + (fontFamily || '') + (isBold ? 'bold' : '') + resolution;
+    return this.points[key] || this._createTextPoint(text, fontFamily, isBold, resolution);
+  }
+  
+  TextPointSet.prototype.getAll = function (text, fontFamily, isBold, resolution) {
+    var that = this;
+    return text.split('').map(function (item) {
+      return that.get(item, fontFamily, isBold, resolution);
+    })
+  }
+  
+  TextPointSet.prototype._createTextPoint = function (text, fontFamily, isBold, resolution) {
+    resolution = parseInt(resolution) || 64;
+    var canvas = this.canvas, ctx = this.ctx, size = resolution;
+    this.clearCanvas();
+    canvas.width = canvas.height = size;
+    
+    var fontStyle = isBold ? 'bold ' : '';
+    var fontSize = Math.floor(size * 0.8);
+    ctx.font = fontStyle + fontSize + "px " + (fontFamily || 'SimSun');
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(text, size / 2, size / 2);
+    
+    var canvasData = ctx.getImageData(0, 0, size, size).data,
+      textPointSet = [];
+    for (var i = 0; i < size; i++) {
+      textPointSet.push(temp = []);
+      for (var j = 0; j < size; j++) {
+        var index = i * size * 4 + j * 4;
+        var a = canvasData[index + 3];
+        temp.push(a ? 1 : 0);
+      }
+    }
+    var key = text + (fontFamily || '') + (isBold ? 'bold' : '') + resolution;
+    return this.points[key] = textPointSet;
+  }
+  
+  TextPointSet.prototype.clearCanvas = function () {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+  }
+  
+  TextPointSet.prototype.getCanvas = function (points, options) {
+    if(!options){
+      options = {
+        size: 200,
+        pointScale: 0.5,
+        spacing: 20,
+        ledColor: '#ffff00',
+        bgColor: 'rgb(50,50,50)'
+      }
+    }
+    var canvas = document.createElement('canvas'),
+     ctx = canvas.getContext('2d'),
+    length = points.length,
+      oneTempLength = options.size / length;
+    canvas.height = options.size;
+    canvas.width = options.size;
+    
+    for (var i = 0; i < length; i++) {
+      for (var j = 0; j < length; j++) {
+        ctx.fillStyle = points[i][j] ? options.ledColor : options.bgColor;
+        ctx.beginPath();
+        ctx.arc(oneTempLength * (j + .5), oneTempLength * (i + .5), oneTempLength * options.pointScale, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    return canvas;
+  }
+
+  var textTest = new TextPointSet();
+  var displayContainer = document.getElementById('display-container');
+  var textInput = document.getElementById('text-input');
+  var fontFamilySelect = document.getElementById('font-family');
+  var boldCheckbox = document.getElementById('bold-text');
+  var resolutionSelect = document.getElementById('resolution');
+  var ledColorPicker = document.getElementById('led-color');
+  var ledColorValue = document.getElementById('led-color-value');
+  var canvasSizeSlider = document.getElementById('canvas-size');
+  var canvasSizeValue = document.getElementById('canvas-size-value');
+  var pointScaleSlider = document.getElementById('point-scale');
+  var pointScaleValue = document.getElementById('point-scale-value');
+  var charSpacingSlider = document.getElementById('char-spacing');
+  var charSpacingValue = document.getElementById('char-spacing-value');
+  var saveBtn = document.getElementById('save-btn');
+  
+  updateDisplay('输入文字', getCurrentOptions());
+
+  textInput.addEventListener('input', updateFromControls);
+  fontFamilySelect.addEventListener('change', updateFromControls);
+  boldCheckbox.addEventListener('change', updateFromControls);
+  resolutionSelect.addEventListener('change', updateFromControls);
+  ledColorPicker.addEventListener('input', function() {
+    ledColorValue.textContent = this.value;
+    updateFromControls();
+  });
+  canvasSizeSlider.addEventListener('input', function() {
+    canvasSizeValue.textContent = this.value;
+    updateFromControls();
+  });
+  pointScaleSlider.addEventListener('input', function() {
+    pointScaleValue.textContent = this.value;
+    updateFromControls();
+  });
+  charSpacingSlider.addEventListener('input', function() {
+    charSpacingValue.textContent = this.value;
+    updateFromControls();
+  });
+  saveBtn.addEventListener('click', saveAsImage);
+
+  function getCurrentOptions() {
+    return {
+      fontFamily: fontFamilySelect.value,
+      isBold: boldCheckbox.checked,
+      resolution: resolutionSelect.value,
+      ledColor: ledColorPicker.value,
+      size: parseInt(canvasSizeSlider.value),
+      pointScale: parseFloat(pointScaleSlider.value),
+      spacing: parseInt(charSpacingSlider.value),
+      bgColor: 'rgb(50,50,50)'
+    };
+  }
+
+  function updateFromControls() {
+    updateDisplay(textInput.value, getCurrentOptions());
+  }
+
+  function updateDisplay(text, options) {
+    displayContainer.innerHTML = '';
+    if (!text) return;
+    textTest.getAll(text, options.fontFamily, options.isBold, options.resolution).forEach((item, index) => {
+      const canvas = textTest.getCanvas(item, options);
+      if (index > 0) canvas.style.marginLeft = options.spacing + 'px';
+      displayContainer.appendChild(canvas);
+    });
+  }
+
+  function saveAsImage() {
+    const canvases = displayContainer.querySelectorAll('canvas');
+    if (!canvases.length) return alert('没有可保存的图像');
+
+    const totalWidth = Array.from(canvases).reduce((sum, c, i) => sum + c.width + (i ? parseInt(charSpacingSlider.value) : 0), 0);
+    const height = canvases[0].height;
+
+    const mergedCanvas = document.createElement('canvas');
+    mergedCanvas.width = totalWidth;
+    mergedCanvas.height = height;
+    const ctx = mergedCanvas.getContext('2d');
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, mergedCanvas.width, mergedCanvas.height);
+
+    let offsetX = 0;
+    canvases.forEach((c, i) => {
+      ctx.drawImage(c, offsetX, 0);
+      offsetX += c.width + parseInt(charSpacingSlider.value);
+    });
+
+    const link = document.createElement('a');
+    link.download = (textInput.value || '点阵文字') + '.png';
+    link.href = mergedCanvas.toDataURL('image/png');
+    link.click();
+  }
+</script>
+</body>
+</html>
