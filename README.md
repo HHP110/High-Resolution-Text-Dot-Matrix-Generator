@@ -39,16 +39,6 @@
 - 像素艺术创作
 - UI元素设计
 
-## 参与贡献
-
-欢迎任何形式的贡献！请按以下步骤操作：
-
-1. Fork本仓库
-2. 创建您的功能分支 (`git checkout -b feature/新功能`)
-3. 提交您的修改 (`git commit -m '添加了新功能'`)
-4. 推送分支 (`git push origin feature/新功能`)
-5. 发起Pull Request
-
 ## 支持与联系 
 
 如有任何问题或支持需求：
